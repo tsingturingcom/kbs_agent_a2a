@@ -1,0 +1,205 @@
+# A2A (Agent2Agent) 协议概述 | Protocol Overview
+
+A2A（Agent2Agent）是谷歌推出的开源协议，旨在解决企业AI采用过程中不同框架和厂商构建的智能体之间的互操作性问题。该协议提供了一种标准化的方式，使智能体能够相互发现和展示能力、协商交互方式和内容类型、安全协作完成复杂任务，以及支持实时状态更新和推送通知。
+
+A2A (Agent2Agent) is an open protocol launched by Google, designed to solve interoperability issues between intelligent agents built by different frameworks and vendors in enterprise AI adoption. The protocol provides a standardized way for agents to discover and showcase capabilities, negotiate interaction methods and content types, securely collaborate on complex tasks, and support real-time status updates and push notifications.
+
+KBS_Agent_A2A是一个**协议适配中间件**（Protocol Adaptation Middleware），专注于实现谷歌开源的Agent2Agent (A2A)协议标准。该项目旨在解决不同AI框架和厂商构建的智能体之间的互操作性问题，提供标准化的通信接口和数据交换格式。项目名称中：
+
+KBS_Agent_A2A is a **Protocol Adaptation Middleware** focused on implementing Google's open-source Agent2Agent (A2A) protocol standard. This project aims to solve interoperability issues between intelligent agents built by different AI frameworks and vendors, providing standardized communication interfaces and data exchange formats. In the project name:
+
+- **KBS**：代表Knowledge-Based Sharing（基于知识的分享），体现项目开放分享的理念
+- **Agent**：指智能体，负责执行特定任务的软件实体
+- **A2A**：代表对Google Agent2Agent协议的实现与适配
+
+- **KBS**: Stands for Knowledge-Based Sharing, embodying the project's open sharing philosophy
+- **Agent**: Refers to intelligent agents, software entities responsible for executing specific tasks
+- **A2A**: Represents the implementation and adaptation of Google's Agent2Agent protocol
+
+## 1. 项目来源 | Project Source
+
+本项目基于以下谷歌官方资源开发：
+
+This project is developed based on the following Google official resources:
+
+- **A2A协议官方文档 | A2A Protocol Official Documentation**：[https://google.github.io/A2A/#/documentation](https://google.github.io/A2A/#/documentation)
+  - 提供了协议的详细规范、核心概念和实现指南
+  - Provides detailed protocol specifications, core concepts, and implementation guidelines
+  - 包含任务状态流转、消息格式和API接口定义
+  - Includes task state transitions, message formats, and API interface definitions
+
+- **A2A参考实现 | A2A Reference Implementation**：[https://github.com/google/A2A](https://github.com/google/A2A)
+  - 谷歌官方提供的示例代码和参考实现
+  - Official sample code and reference implementation provided by Google
+  - 包含多种框架的样例和演示应用
+  - Contains samples and demo applications for various frameworks
+
+KBS_Agent_A2A在这些基础上进行了扩展，实现了针对RagFlow和Dify等框架的协议适配。
+
+KBS_Agent_A2A extends these foundations by implementing protocol adaptations for frameworks such as RagFlow and Dify.
+
+## 2. 框架适配 | Framework Adaptation
+
+目前，本项目实现了以下框架的A2A协议适配：
+
+Currently, this project implements A2A protocol adaptations for the following frameworks:
+
+### RagFlow适配 | RagFlow Adaptation
+RagFlow是一个专注于**检索增强生成**（Retrieval-Augmented Generation, RAG）的框架，主要功能是将大型语言模型与外部知识库结合，提升生成内容的准确性和相关性。本项目通过**API规范化**和**协议封装**，使RagFlow能够与其他支持A2A协议的系统进行标准化通信。
+
+RagFlow is a framework focused on **Retrieval-Augmented Generation (RAG)**, primarily combining large language models with external knowledge bases to enhance the accuracy and relevance of generated content. This project enables RagFlow to communicate in a standardized way with other systems supporting the A2A protocol through **API standardization** and **protocol encapsulation**.
+
+### Dify适配（计划中）| Dify Adaptation (Planned)
+Dify是一个开源的**LLMOps**（大语言模型运维）平台，提供可视化的AI应用构建工具和运行环境。我们计划进行**跨平台协议兼容**工作，使Dify能够通过A2A协议与其他智能体系统进行标准化交互。
+
+Dify is an open-source **LLMOps** (Large Language Model Operations) platform providing visual AI application building tools and runtime environments. We plan to implement **cross-platform protocol compatibility** to enable Dify to interact with other intelligent agent systems through the A2A protocol in a standardized manner.
+
+## 3. 技术架构 | Technical Architecture
+
+项目采用模块化设计，主要包含三个核心部分：
+
+The project adopts a modular design with three core components:
+
+- **common**: 共享基础设施，实现**协议抽象层**（Protocol Abstraction Layer）
+  - **client**: A2A客户端实现，用于与服务器通信
+  - **server**: 服务器端基础组件，包括任务管理器
+  - **utils**: 通用工具类，如推送通知认证、缓存等
+  - **types.py**: 核心数据类型定义，实现A2A协议的数据结构
+
+- **common**: Shared infrastructure implementing the **Protocol Abstraction Layer**
+  - **client**: A2A client implementation for server communication
+  - **server**: Server-side basic components, including task managers
+  - **utils**: Common utilities such as push notification authentication and caching
+  - **types.py**: Core data type definitions implementing A2A protocol data structures
+
+- **agents**: 智能体服务器实现，**适配器模式**（Adapter Pattern）应用
+  - **ragflow**: 专为RAG流程设计的智能体适配器，实现协议转换和能力映射
+
+- **agents**: Intelligent agent server implementation, applying the **Adapter Pattern**
+  - **ragflow**: Intelligent agent adapter designed specifically for RAG processes, implementing protocol conversion and capability mapping
+
+- **hosts**: 客户端应用实现，作为**互操作性桥接器**（Interoperability Bridge）
+  - **ragflow_cli**: 命令行客户端，用于与适配后的智能体交互
+
+- **hosts**: Client application implementation, serving as an **Interoperability Bridge**
+  - **ragflow_cli**: Command-line client for interacting with adapted intelligent agents
+
+## 4. 核心功能 | Core Functions
+
+- **协议标准化实现 | Protocol Standardization**: 完整实现A2A协议规范，提供统一的API接口
+- **适配器转换层 | Adapter Conversion Layer**: 将特定框架API映射到A2A协议规范
+- **多模态交互支持 | Multimodal Interaction Support**: 支持文本、文件等多种内容类型的交互
+- **实时状态同步 | Real-time State Synchronization**: 通过流式处理和推送通知机制实现实时状态更新
+- **安全认证机制 | Security Authentication**: 支持JWT认证和请求签名验证
+- **会话状态管理 | Session State Management**: 维护多轮对话上下文和状态
+
+## 5. A2A协议说明 | A2A Protocol Description
+
+### 5.1 协议核心组件 | Protocol Core Components
+
+1. **JSON-RPC通信 | JSON-RPC Communication**: A2A基于JSON-RPC 2.0标准实现，支持HTTP(S)请求/响应和Server-Sent Events (SSE)流式通信
+2. **AgentCard**: 智能体元数据描述文件（通常位于`/.well-known/agent.json`），包含名称、描述、URL、支持的输入/输出模式、技能列表等
+3. **Task生命周期 | Task Lifecycle**: 任务状态流转模型，包括submitted、working、input-required、completed、canceled、failed等状态
+4. **多模态内容 | Multimodal Content**: 通过Part系统支持文本(TextPart)、文件(FilePart)和结构化数据(DataPart)
+5. **标准化API方法 | Standardized API Methods**:
+   - `tasks/send`: 发送任务请求 | Send task request
+   - `tasks/sendSubscribe`: 发送任务并建立流式事件订阅 | Send task and establish streaming event subscription
+   - `tasks/get`: 获取任务状态和结果 | Get task status and results
+   - `tasks/cancel`: 取消正在进行的任务 | Cancel an ongoing task
+   - `tasks/pushNotification/set`: 配置推送通知 | Configure push notifications
+   - `tasks/pushNotification/get`: 获取推送通知配置 | Get push notification configuration
+   - `tasks/resubscribe`: 重新订阅之前的任务流 | Resubscribe to previous task stream
+
+### 5.2 高级功能特性 | Advanced Features
+
+- **流式处理 | Streaming Processing**: 长时间运行的任务可通过SSE提供实时更新，以`TaskStatusUpdateEvent`和`TaskArtifactUpdateEvent`形式发送
+- **推送通知 | Push Notifications**: 支持通过webhook和JWT安全认证机制实现主动推送任务状态更新
+- **构件流式传输 | Artifact Streaming**: 对于大型构件，支持分块传输，具有append和lastChunk标记
+- **状态转换历史 | State Transition History**: 可选支持详细的任务状态变化历史记录
+- **错误处理机制 | Error Handling**: 标准化的错误代码和消息格式，包括JSON-RPC标准错误和A2A特定错误
+
+### 5.3 A2A核心概念 | A2A Core Concepts
+
+- **AgentCard(智能体卡片 | Agent Card)**: 公共元数据文件，描述智能体的能力、技能、端点URL和认证需求，供客户端用于发现
+- **Task(任务 | Task)**: 工作的核心单元，具有唯一ID，通过状态流转(submitted→working→input-required→completed/failed/canceled)管理生命周期
+- **Message(消息 | Message)**: 表示客户端(role:"user")和智能体(role:"agent")之间的通信轮次，包含Parts
+- **Part(部分 | Part)**: Message或Artifact中的基本内容单元，可以是TextPart、FilePart(带内联字节或URI)或DataPart(结构化JSON数据)
+- **Artifact(构件 | Artifact)**: 表示智能体在任务执行过程中生成的输出(如生成的文件、最终的结构化数据)，也包含Parts
+- **TaskStatus(任务状态 | Task Status)**: 描述任务的当前状态，包含state(状态)、message(消息)和timestamp(时间戳)信息
+- **Event(事件 | Event)**: 流式更新中的基本通信单元，包括TaskStatusUpdateEvent(状态更新)和TaskArtifactUpdateEvent(构件更新)
+- **Session(会话 | Session)**: 上下文容器，可包含多个相关任务，维持对话连贯性，通过sessionId标识
+
+### 5.4 会话、任务与消息的关系 | Relationship between Sessions, Tasks, and Messages
+
+A2A协议中，会话、任务和消息形成了多级嵌套的层次结构：
+
+In the A2A protocol, sessions, tasks, and messages form a multi-level nested hierarchical structure:
+
+```
+Session (会话 | Session)
+└── Task (任务 | Task) - 可以有多个 | can have multiple
+    ├── Message (消息 | Message) - 可以有多个 | can have multiple
+    │   └── Part (部分 | Part) - 每个消息可以有多个部分 | each message can have multiple parts
+    └── Artifact (构件 | Artifact) - 可以有多个 | can have multiple
+        └── Part (部分 | Part) - 每个构件可以有多个部分 | each artifact can have multiple parts
+```
+
+这种结构支持多种使用模式：
+
+This structure supports multiple usage patterns:
+
+1. **一个任务一个消息 | One task, one message**: 适用于独立问答场景，简单直接 | Suitable for standalone Q&A scenarios, simple and direct
+2. **一个任务多个消息 | One task, multiple messages**: 适用于多步骤流程，如需要澄清的交互式对话 | Suitable for multi-step processes, such as interactive dialogues requiring clarification
+3. **一个会话多个任务 | One session, multiple tasks**: 适用于复杂应用中的子任务划分，保持上下文连贯性 | Suitable for subtask division in complex applications, maintaining context coherence
+
+在实际应用中：
+
+In practical applications:
+
+- 会话是状态和上下文的持有者，通过`sessionId`字段关联多个任务 | Sessions hold state and context, linking multiple tasks via the `sessionId` field
+- 任务是工作单元，有明确的状态和生命周期，包含用户与智能体的交互消息 | Tasks are work units with clear states and lifecycles, containing interaction messages between users and agents
+- 消息是通信单元，表达用户需求或智能体响应，由多个内容部分组成 | Messages are communication units expressing user needs or agent responses, composed of multiple content parts
+- 构件是任务的输出产物，可能随着任务进行而逐步生成或更新 | Artifacts are task outputs that may be gradually generated or updated as the task progresses
+
+A2A协议注重"会话(Session)"而非"用户(User)"，使系统能够在不要求显式用户注册的情况下，通过会话ID维护状态和上下文连贯性。
+
+The A2A protocol emphasizes "Sessions" rather than "Users," allowing the system to maintain state and context coherence through session IDs without requiring explicit user registration.
+
+### 5.5 安全与认证 | Security and Authentication
+
+- **多种认证方案 | Multiple Authentication Schemes**: 在AgentCard中定义，支持API密钥、OAuth、JWT等 | Defined in AgentCard, supporting API keys, OAuth, JWT, etc.
+- **推送通知安全 | Push Notification Security**: 使用挑战-响应模式进行URL验证，以及JWT令牌确保通信安全 | Using challenge-response patterns for URL validation and JWT tokens to ensure communication security
+- **请求签名验证 | Request Signature Verification**: 确保请求完整性和来源可信 | Ensuring request integrity and trusted sources
+- **授权模型 | Authorization Model**: 实现基于角色的访问控制，确保只有具有正确凭证和权限的智能体才能参与关键工作流 | Implementing role-based access control, ensuring only agents with correct credentials and permissions can participate in critical workflows
+- **数据加密 | Data Encryption**: 要求在整个通信生命周期中进行加密数据交换，保护敏感信息 | Requiring encrypted data exchange throughout the communication lifecycle to protect sensitive information
+
+## 6. 快速开始 | Quick Start
+
+### 安装依赖 | Install Dependencies
+
+```bash
+pip install -e .
+```
+
+### 启动服务器 | Start Server
+
+```bash
+python -m agents.ragflow
+```
+
+### 使用命令行客户端 | Use Command-line Client
+
+```bash
+python -m hosts.ragflow_cli --url http://localhost:8000
+```
+
+## 7. 技术价值 | Technical Value
+
+KBS_Agent_A2A项目代表了AI系统集成领域的工作：
+
+The KBS_Agent_A2A project represents important work in the field of AI system integration:
+
+- **标准化实现 | Standardized Implementation**: 将理论协议规范转化为可用的实际代码 | Transforming theoretical protocol specifications into usable, practical code
+- **生态系统扩展 | Ecosystem Expansion**: 扩展A2A协议生态，增加支持该协议的系统数量 | Expanding the A2A protocol ecosystem, increasing the number of systems supporting this protocol
+- **框架互通 | Framework Interoperability**: 使不同框架(RagFlow和Dify)能够互相通信 | Enabling different frameworks (RagFlow and Dify) to communicate with each other
+- **开发者工具 | Developer Tools**: 为开发者提供标准化的接口和工具，简化多智能体系统的开发 | Providing developers with standardized interfaces and tools, simplifying multi-agent system development 
