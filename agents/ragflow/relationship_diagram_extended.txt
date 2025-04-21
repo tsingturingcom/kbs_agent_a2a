@@ -1,0 +1,86 @@
+                             +-------------------------+
+                             |    task_manager.py      |
+                             | (抽象基类TaskManager)    |
+                             | (实现类InMemoryTaskManager)|
+                             +------------+------------+
+                                          |
+                                          | 继承
+                                          |
+           +-----------------------+------+---------------+
+           |                       |                      |
+           |                       |                      |
++----------v-----------+ +---------v--------------+      |
+| db_task_manager.py   | |                        |      |
+| (DatabaseTaskManager)| |      models.py         |      |
+| (实现持久化任务管理)   | |  (SQLAlchemy ORM模型)  |      |
++--------------------+-+ +-------^----------------+      |
+           |                      |                      |
+           | 使用                 | 使用                  |
+           |                      |                      |
++----------v-------------------+--v--------------------+-v-+
+|      task_manager_factory.py                            |
+|  (工厂类，根据配置创建合适的TaskManager实例)              |
++-------+---------------+-------------------------------+-+
+        |               |                               |
+        | 创建实例       | 创建实例                       |
+        |               |                               |
+        |       +-------v-------+                       |
+        |       |  server.py    |                       |
+        |       | (A2AServer类) |                       |
+        |       +-------+-------+                       |
+        |               |                               |
+        |               | 使用                           |
+        |               |                               |
++-------v-------+       |                        +------v------+
+| __main__.py   |       |                        | task_manager.py|
+| (启动入口)     <-------+------------------------> (RagFlowTaskManager)|
+| (服务配置)     |       使用                      | (业务逻辑实现) |
++---------------+                                +------+------+
+        |                                               |
+        | 创建实例                                       | 组合
+        |                                               |
++-------v-------+                                +------v------+
+|   agent.py    |                                |session_manager.py|
+| (RagFlowAgent)|<-------------------------------+(SessionManager) |
+| (与RagFlow交互)|              使用              | (会话映射管理)  |
++---------------+                                +---------------+ 
+
+ommon 模块（5个文件）- 基础架构
+task_manager.py：
+定义了任务管理的抽象基类 TaskManager
+实现了基础内存任务管理器 InMemoryTaskManager
+db_task_manager.py：
+继承自 TaskManager 抽象基类
+实现 DatabaseTaskManager 类，提供数据库持久化存储
+models.py：
+定义 SQLAlchemy ORM 数据模型
+被 DatabaseTaskManager 使用进行数据库操作
+task_manager_factory.py：
+工厂类，根据配置创建任务管理器实例
+支持数据迁移（内存存储 → 数据库存储）
+server.py：
+实现 HTTP 服务器 A2AServer 类
+处理和分发 JSON-RPC 请求
+RagFlow 模块（4个文件）- 业务实现
+task_manager.py (RagFlow模块)：
+实现 RagFlowTaskManager 类，采用组合模式
+包装底层任务管理器，添加RagFlow特定业务逻辑
+agent.py：
+实现 RagFlowAgent 类
+负责与RagFlow API进行实际通信
+session_manager.py：
+实现 SessionManager 类
+管理A2A会话ID与RagFlow会话ID的映射关系
+提供持久化会话存储
+main_.py：
+应用入口点
+处理命令行参数和环境变量
+配置并启动整个服务
+架构分层
+整个系统采用多层架构：
+基础设施层：数据存储和HTTP服务 (models.py, db_task_manager.py)
+中间件层：任务管理和工厂 (task_manager.py, task_manager_factory.py)
+业务逻辑层：RagFlow特定实现 (RagFlow模块的task_manager.py, agent.py)
+应用层：服务配置和启动 (main.py)
+在整个架构中，最核心的是"组合"模式的应用 - RagFlowTaskManager组合了基础TaskManager实现，通过这种方式实现了功能扩展而不影响原有架构。
+这种设计让系统既灵活又可维护 - 存储层可以独立更改，业务逻辑可以独立演化，各组件之间通过清晰的接口进行交互

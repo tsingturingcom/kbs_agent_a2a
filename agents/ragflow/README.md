@@ -350,6 +350,83 @@ python -m agents.ragflow --agent-id your-agent-id
 
 ## 技术详情 | Technical Details
 
+### A2A协议响应方式 | A2A Protocol Response Methods
+
+A2A协议提供了三种不同的响应方式，以适应不同的应用场景和需求。当前RagFlow A2A实现已经完整支持所有这三种响应方式，代码位于`common/server`目录：
+
+#### 1. 同步响应（Synchronous Response）- 已实现
+- **实现位置**：`server.py`中的`_process_request`和`_create_response`方法，`task_manager.py`中的`on_send_task`等
+- **传输机制**：标准HTTP请求/响应
+- **格式**：JSON-RPC 2.0响应格式
+- **特点**：
+  - 客户端发送请求后等待完整响应
+  - 适合快速完成的任务
+  - 单次请求-响应模式
+
+**已实现代码示例**：
+```python
+# server.py中的实现
+def _create_response(self, result: Any) -> JSONResponse | EventSourceResponse:
+    if isinstance(result, JSONRPCResponse):
+        return JSONResponse(result.model_dump(exclude_none=True))
+```
+
+#### 2. 流式响应（Streaming Response）- 已实现
+- **实现位置**：`server.py`中的EventSourceResponse处理，`task_manager.py`和`db_task_manager.py`中的`dequeue_events_for_sse`方法
+- **传输机制**：Server-Sent Events (SSE)
+- **格式**：事件流，每个事件是一个JSON对象
+- **特点**：
+  - 建立长连接，服务器持续推送事件
+  - 支持实时状态更新和进度报告
+  - 适合长时间运行的任务
+  - 包含TaskStatusUpdateEvent和TaskArtifactUpdateEvent
+
+**已实现代码示例**：
+```python
+# server.py中的实现
+def _create_response(self, result: Any) -> JSONResponse | EventSourceResponse:
+    if isinstance(result, AsyncIterable):
+        async def event_generator(result) -> AsyncIterable[dict[str, str]]:
+            async for item in result:
+                yield {"data": item.model_dump_json(exclude_none=True)}
+        return EventSourceResponse(event_generator(result))
+```
+
+#### 3. 推送通知（Push Notifications）- 已实现
+- **实现位置**：`task_manager.py`和`db_task_manager.py`中的`send_task_notification`方法，以及`common/utils/push_notification_auth.py`
+- **传输机制**：HTTP webhook调用
+- **格式**：带JWT认证的HTTP POST请求
+- **特点**：
+  - 服务器主动向客户端指定URL发送通知
+  - 无需客户端保持连接
+  - 适合异步通知和后台任务
+  - 支持第三方系统集成
+
+**已实现代码示例**：
+```python
+# task_manager.py中的实现
+async def send_task_notification(self, task: Task):
+    if not await self.has_push_notification_info(task.id):
+        return
+    push_info = await self.get_push_notification_info(task.id)
+    await self.notification_sender_auth.send_push_notification(
+        push_info.url,
+        data=task.model_dump(exclude_none=True)
+    )
+```
+
+#### 响应方式对比 | Response Method Comparison
+
+所有这三种响应方式都已在RagFlow A2A服务器中完整实现，并通过以下API端点暴露：
+
+| 响应方式 | 对应API方法 | 实现文件 | 实现状态 |
+|---------|------------|---------|--------|
+| 同步响应 | `tasks/send`, `tasks/get` | server.py, task_manager.py | ✅ 完全实现 |
+| 流式响应 | `tasks/sendSubscribe`, `tasks/resubscribe` | server.py, task_manager.py | ✅ 完全实现 |
+| 推送通知 | `tasks/pushNotification/set` | task_manager.py, utils/push_notification_auth.py | ✅ 完全实现 |
+
+服务器端根据客户端的请求方式自动选择合适的响应方式，确保信息高效传递的同时保持灵活性，同时维护了接口规范的一致性和A2A协议的完整实现。
+
 ### 与A2A协议的集成 | Integration with A2A Protocol
 
 #### 数据转换 | Data Transformation

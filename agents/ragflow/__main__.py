@@ -10,7 +10,7 @@ project_root = os.path.abspath(os.path.join(current_dir, "../.."))  # 只需上�
 sys.path.insert(0, project_root)  # 直接添加项目根目录
 
 from common.server import A2AServer
-from common.types import AgentCard, AgentCapabilities, AgentSkill, MissingAPIKeyError, AgentProvider
+from common.types import AgentCard, AgentCapabilities, AgentSkill, MissingAPIKeyError, AgentProvider, AgentAuthentication
 from common.utils.push_notification_auth import PushNotificationSenderAuth
 from agents.ragflow.task_manager import RagFlowTaskManager
 from agents.ragflow.agent import RagFlowAgent
@@ -140,6 +140,69 @@ async def async_main(host, port, chat_id, agent_id, ragflow_url):
                 outputModes=["text"]
             )
         ],
+        # A2A协议标准可选字段：身份验证设置 | A2A Protocol optional standard field: authentication settings
+        # 注意：虽然这里定义了认证结构，但当前服务端实际上并未启用认证验证
+        # Note: Although authentication structure is defined here, the server does not actually enforce authentication currently
+        # 这种配置会让客户端知道服务支持哪些认证方式，但不会强制客户端提供认证信息
+        # This configuration informs clients about supported authentication methods without requiring them to authenticate
+        # 未来计划启用认证时，可直接修改服务端代码而无需更改此定义
+        # When authentication is to be enabled in the future, server code can be modified without changing this definition
+        #
+        # A2A协议支持的认证方式包括：| Authentication methods supported by A2A protocol include:
+        # 1. apiKey: API密钥认证，通常在HTTP头或查询参数中传递简单的令牌 | API key authentication, typically a simple token passed in HTTP headers or query parameters
+        # 2. oauth2: OAuth 2.0授权框架，支持多种授权流程，适用于用户授权场景 | OAuth 2.0 authorization framework, supports various flows, suitable for user authorization scenarios
+        # 3. jwt: JSON Web Token认证，用于安全传输声明，适合跨服务认证 | JSON Web Token authentication, for secure claims transfer, ideal for cross-service authentication
+        # 4. basic: 基本HTTP认证，使用用户名和密码 | Basic HTTP authentication using username and password
+        # 5. openid: OpenID Connect身份认证，基于OAuth 2.0扩展，提供身份层 | OpenID Connect authentication, extends OAuth 2.0 with an identity layer
+        authentication=AgentAuthentication(
+            schemes=["apiKey", "oauth2"],  # 支持的认证方案 | Supported authentication schemes
+            credentials=None,  # 默认凭证 | Default credentials
+            securityDefinitions={  # 安全定义 | Security definitions
+                "apiKey": {
+                    "type": "apiKey",
+                    "in": "header",
+                    "name": "X-API-KEY",
+                    "description": "用于API认证的密钥 | API key for authentication"
+                },
+                "oauth2": {
+                    "type": "oauth2",
+                    "flows": {
+                        "clientCredentials": {
+                            "tokenUrl": "https://auth.tsingturing.com/token",
+                            "scopes": {
+                                "ragflow:read": "读取知识库内容 | Read knowledge base content",
+                                "ragflow:query": "查询知识库 | Query knowledge base"
+                            }
+                        }
+                    }
+                }
+            }
+        ),
+        
+        # A2A协议标准可选字段：性能指标 | A2A Protocol optional standard field: performance metrics
+        metrics={
+            "averageResponseTime": "暂未测量",  # 平均响应时间 | Average response time
+            "successRate": "暂未统计"  # 成功率 | Success rate
+        },
+        
+        # A2A协议标准可选字段：使用限制 | A2A Protocol optional standard field: usage limits
+        limits={
+            "requestsPerMinute": None,  # 每分钟请求数限制 | Request rate limit per minute
+            "maxMessageLength": None    # 最大消息长度限制 | Maximum message length limit
+        },
+        
+        # A2A协议标准可选字段：定价信息 | A2A Protocol optional standard field: pricing information
+        pricing={
+            "model": "free",  # 定价模式：免费 | Pricing model: free
+            "details": "免费服务"  # 定价详情 | Pricing details
+        },
+        
+        # 自定义元数据，用于非标准扩展字段 | Custom metadata for non-standard extension fields
+        metadata={
+            "customField": "示例值",  # 自定义字段示例 | Example of custom field
+            "environment": "development",  # 环境标识 | Environment identifier
+            "implementationNotes": "RagFlow A2A适配器实现" # 实现说明 | Implementation notes
+        }
     )
     
     # 创建RagFlow代理实例
