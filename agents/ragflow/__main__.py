@@ -43,7 +43,8 @@ logger = logging.getLogger(__name__)
 @click.option("--ragflow-url", "ragflow_url", default=None, help="RagFlow服务器URL，默认从环境变量RAGFLOW_API_URL或RAGFLOW_ENDPOINT读取")
 @click.option("--storage-type", "storage_type", default=None, help="任务存储类型: memory或database，默认从环境变量TASK_STORAGE_TYPE读取")
 @click.option("--db-url", "db_url", default=None, help="数据库连接URL，默认从环境变量TASK_DB_URL读取")
-def main(host, port, chat_id, agent_id, ragflow_url, storage_type, db_url):
+@click.option("--public-url", "public_url", default=None, help="公开访问的URL（如https://ragflow.example.com），用于AgentCard，与Nginx等反向代理配合使用")
+def main(host, port, chat_id, agent_id, ragflow_url, storage_type, db_url, public_url):
     """启动RagFlow代理服务器"""
     
     # 设置环境变量
@@ -67,13 +68,13 @@ def main(host, port, chat_id, agent_id, ragflow_url, storage_type, db_url):
 
     try:
         # 启动异步服务器
-        asyncio.run(async_main(host, port, chat_id, agent_id, ragflow_url))
+        asyncio.run(async_main(host, port, chat_id, agent_id, ragflow_url, public_url))
     except KeyboardInterrupt:
         logger.info("服务器已被用户中断")
     except Exception as e:
         logger.error(f"服务器启动错误: {e}", exc_info=True)
 
-async def async_main(host, port, chat_id, agent_id, ragflow_url):
+async def async_main(host, port, chat_id, agent_id, ragflow_url, public_url=None):
     """异步服务器启动实现"""
     # 验证API密钥和URL
     api_key = os.environ.get("RAGFLOW_API_KEY")
@@ -115,11 +116,14 @@ async def async_main(host, port, chat_id, agent_id, ragflow_url):
     # 确定代理能力
     capabilities = AgentCapabilities(streaming=True, pushNotifications=True)
     
+    # 确定代理URL，优先使用public_url
+    agent_url = public_url if public_url else f"http://{host}:{port}/"
+    
     # 创建代理卡片
     agent_card = AgentCard(
         name=agent_name,
         description=agent_description,
-        url=f"http://{host}:{port}/",
+        url=agent_url,  # 使用动态确定的URL
         version="1.0.0",
         defaultInputModes=RagFlowAgent.SUPPORTED_CONTENT_TYPES,
         defaultOutputModes=RagFlowAgent.SUPPORTED_CONTENT_TYPES,

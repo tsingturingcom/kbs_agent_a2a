@@ -347,6 +347,7 @@ python -m agents.ragflow --agent-id your-agent-id
 - `--host`: 服务器主机名，默认为localhost | Server hostname, default is localhost
 - `--port`: 服务器端口，默认为10003 | Server port, default is 10003
 - `--ragflow-url`: RagFlow API URL，覆盖环境变量设置 | Overrides environment variable settings
+- `--public-url`: 公开访问的URL，用于AgentCard（如https://ragflow.example.com），与Nginx等反向代理配合使用 | Public access URL for AgentCard (e.g., https://ragflow.example.com), used with reverse proxies like Nginx
 
 ## 技术详情 | Technical Details
 
@@ -493,6 +494,56 @@ Mapping between RagFlow states and A2A task states:
 - RagFlow API错误：捕获并转换为A2A错误格式
 - 网络错误：重试机制和友好错误消息
 - 认证错误：详细的错误提示和恢复建议
+
+### 部署到生产环境 | Production Deployment
+
+在生产环境中部署RagFlow A2A服务时，建议使用Nginx等反向代理来处理HTTPS连接，以提供更好的安全性和性能。
+
+#### 使用Nginx处理HTTPS | Using Nginx for HTTPS
+
+1. **服务器配置** | **Server Configuration**
+   - 使用`--public-url`参数指定公共HTTPS URL
+   - RagFlow服务器内部仍使用HTTP（性能更好）
+   ```bash
+   python -m agents.ragflow --host 127.0.0.1 --port 10003 --chat-id your-chat-id --public-url https://ragflow.example.com
+   ```
+
+2. **Nginx配置** | **Nginx Configuration**
+   ```nginx
+   server {
+       listen 443 ssl;
+       server_name ragflow.example.com;
+
+       # SSL证书配置 | SSL certificate configuration
+       ssl_certificate     /path/to/cert.pem;
+       ssl_certificate_key /path/to/key.pem;
+       
+       # 安全配置 | Security configuration
+       ssl_protocols TLSv1.2 TLSv1.3;
+       
+       # 反向代理到内部RagFlow服务 | Reverse proxy to internal RagFlow service
+       location / {
+           proxy_pass http://127.0.0.1:10003;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           
+           # SSE支持（用于流式响应）| SSE support (for streaming responses)
+           proxy_http_version 1.1;
+           proxy_set_header Connection "";
+           proxy_buffering off;
+           proxy_cache off;
+           proxy_read_timeout 300s;
+       }
+   }
+   ```
+
+3. **优势** | **Advantages**
+   - 更高效的SSL处理
+   - 更易于管理证书
+   - 额外的安全特性
+   - 更好的缓存和负载均衡能力
+
+AgentCard将使用`--public-url`指定的HTTPS URL，客户端将使用HTTPS与服务器通信，但RagFlow服务器本身不需要处理SSL，简化了实现并提高了性能。
 
 ## 实际案例 | Practical Examples
 
