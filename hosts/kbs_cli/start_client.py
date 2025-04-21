@@ -9,8 +9,9 @@ import importlib.util
 
 # 获取当前脚本的绝对路径
 current_file = os.path.abspath(__file__)
-# 获取项目根目录
-project_root = os.path.dirname(current_file)
+# 获取项目根目录（向上两级）
+current_dir = os.path.dirname(current_file)
+project_root = os.path.abspath(os.path.join(current_dir, "../.."))
 # 将项目根目录添加到Python路径
 sys.path.insert(0, project_root)
 

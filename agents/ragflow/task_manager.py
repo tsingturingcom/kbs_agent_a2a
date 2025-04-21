@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+RagFlow任务管理器
+使用组合模式，代理TaskManager接口，添加RagFlow特定的业务逻辑
+"""
 import sys
 import os
+import asyncio
 
 # 添加项目根目录到Python路径（如果尚未添加）
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -9,7 +14,7 @@ project_root = os.path.abspath(os.path.join(current_dir, "../.."))  # 只需上�
 if project_root not in sys.path:
     sys.path.insert(0, project_root)  # 直接添加项目根目录
 
-from typing import AsyncIterable, Union
+from typing import AsyncIterable, Union, Optional
 from common.types import (
     SendTaskRequest,
     TaskSendParams,
@@ -30,29 +35,102 @@ from common.types import (
     PushNotificationConfig,
     SetTaskPushNotificationRequest,
     SetTaskPushNotificationResponse,
-    TaskPushNotificationConfig,
-    TaskNotFoundError,
+    GetTaskPushNotificationRequest,
+    GetTaskPushNotificationResponse,
+    GetTaskRequest,
+    GetTaskResponse,
+    CancelTaskRequest,
+    CancelTaskResponse,
+    TaskResubscriptionRequest,
     InvalidParamsError,
 )
-from common.server.task_manager import InMemoryTaskManager
+from common.server.task_manager import TaskManager
 from agents.ragflow.agent import RagFlowAgent
 from common.utils.push_notification_auth import PushNotificationSenderAuth
 import common.server.utils as utils
-import asyncio
 import logging
 import traceback
 import json
 
 logger = logging.getLogger(__name__)
 
-class RagFlowTaskManager(InMemoryTaskManager):
-    """RagFlow任务管理器，将A2A协议请求映射到RagFlow代理"""
+class RagFlowTaskManager(TaskManager):
+    """
+    RagFlow任务管理器，将A2A协议请求映射到RagFlow代理
     
-    def __init__(self, agent: RagFlowAgent, notification_sender_auth: PushNotificationSenderAuth):
-        super().__init__()
+    使用组合模式，代理TaskManager接口，添加RagFlow特定的业务逻辑，
+    存储实现由任意TaskManager实现提供
+    """
+    
+    def __init__(self, 
+                task_manager: TaskManager, 
+                agent: RagFlowAgent, 
+                notification_sender_auth: PushNotificationSenderAuth):
+        """
+        初始化RagFlow任务管理器
+        
+        Args:
+            task_manager: 存储任务的管理器实例（可以是内存版或数据库版）
+            agent: RagFlow代理实例
+            notification_sender_auth: 推送通知认证
+        """
+        self.task_manager = task_manager
         self.agent = agent
         self.notification_sender_auth = notification_sender_auth
 
+    # 代理基础方法到底层task_manager
+    async def on_get_task(self, request: GetTaskRequest) -> GetTaskResponse:
+        """代理到底层任务管理器"""
+        return await self.task_manager.on_get_task(request)
+
+    async def on_cancel_task(self, request: CancelTaskRequest) -> CancelTaskResponse:
+        """代理到底层任务管理器"""
+        return await self.task_manager.on_cancel_task(request)
+
+    async def on_set_task_push_notification(
+        self, request: SetTaskPushNotificationRequest
+    ) -> SetTaskPushNotificationResponse:
+        """代理到底层任务管理器"""
+        return await self.task_manager.on_set_task_push_notification(request)
+
+    async def on_get_task_push_notification(
+        self, request: GetTaskPushNotificationRequest
+    ) -> GetTaskPushNotificationResponse:
+        """代理到底层任务管理器"""
+        return await self.task_manager.on_get_task_push_notification(request)
+
+    # 代理存储相关方法
+    async def has_push_notification_info(self, task_id: str) -> bool:
+        """查询是否存在推送通知配置"""
+        return await self.task_manager.has_push_notification_info(task_id)
+
+    async def get_push_notification_info(self, task_id: str) -> PushNotificationConfig:
+        """获取推送通知配置"""
+        return await self.task_manager.get_push_notification_info(task_id)
+
+    async def upsert_task(self, task_send_params: TaskSendParams) -> Task:
+        """创建或更新任务"""
+        return await self.task_manager.upsert_task(task_send_params)
+
+    async def update_store(
+        self, task_id: str, status: TaskStatus, artifacts: Optional[list[Artifact]]
+    ) -> Task:
+        """更新任务存储"""
+        return await self.task_manager.update_store(task_id, status, artifacts)
+
+    async def setup_sse_consumer(self, task_id: str, is_resubscribe: bool = False):
+        """设置SSE事件消费者"""
+        return await self.task_manager.setup_sse_consumer(task_id, is_resubscribe)
+
+    async def enqueue_events_for_sse(self, task_id, task_update_event):
+        """将事件加入SSE队列"""
+        await self.task_manager.enqueue_events_for_sse(task_id, task_update_event)
+
+    def dequeue_events_for_sse(self, request_id, task_id, sse_event_queue):
+        """从SSE队列获取事件"""
+        return self.task_manager.dequeue_events_for_sse(request_id, task_id, sse_event_queue)
+
+    # RagFlow特定业务逻辑实现
     async def _run_streaming_agent(self, request: SendTaskStreamingRequest):
         """运行流式代理，处理流式请求"""
         task_send_params: TaskSendParams = request.params
@@ -336,7 +414,7 @@ class RagFlowTaskManager(InMemoryTaskManager):
         )
 
     async def on_resubscribe_to_task(
-        self, request
+        self, request: TaskResubscriptionRequest
     ) -> AsyncIterable[SendTaskStreamingResponse] | JSONRPCResponse:
         """处理重新订阅任务的请求"""
         task_id_params: TaskIdParams = request.params
@@ -359,5 +437,5 @@ class RagFlowTaskManager(InMemoryTaskManager):
         if not is_verified:
             return False
         
-        await super().set_push_notification_info(task_id, push_notification_config)
+        await self.task_manager.set_push_notification_info(task_id, push_notification_config)
         return True 

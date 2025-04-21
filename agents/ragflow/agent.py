@@ -17,6 +17,7 @@ from pydantic import BaseModel
 import asyncio
 import time
 import random
+from agents.ragflow.session_manager import SessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -75,8 +76,8 @@ class RagFlowAgent:
         logger.info(f"初始化RagFlow代理: {'Agent模式' if self.is_agent_mode else 'Chat模式'}, ID: {self.agent_id or self.chat_id}")
         logger.info(f"使用RagFlow API: {self.base_url}")
         
-        # 会话缓存
-        self.sessions = {}
+        # 使用会话管理器替代内存字典
+        self.session_manager = SessionManager()
         
     def get_headers(self):
         """获取API请求头"""
@@ -95,8 +96,11 @@ class RagFlowAgent:
         Returns:
             RagFlow会话ID
         """
-        if session_id in self.sessions:
-            return self.sessions[session_id]
+        # 先尝试从会话管理器获取
+        ragflow_session_id = self.session_manager.get_session(session_id)
+        if ragflow_session_id:
+            logger.info(f"从持久化存储中恢复会话: A2A会话ID {session_id} -> RagFlow会话ID {ragflow_session_id}")
+            return ragflow_session_id
             
         endpoint = None
         if self.is_agent_mode:
@@ -117,10 +121,17 @@ class RagFlowAgent:
                     if response.status_code == 200:
                         data = response.json()
                         if data.get("code") == 0:
-                            # 存储映射关系
+                            # 存储映射关系到持久化存储
                             ragflow_session_id = data["data"]["id"]
-                            self.sessions[session_id] = ragflow_session_id
-                            logger.info(f"创建RagFlow会话成功: A2A会话ID {session_id} -> RagFlow会话ID {ragflow_session_id}")
+                            agent_type = "agent" if self.is_agent_mode else "chat"
+                            agent_id = self.agent_id if self.is_agent_mode else self.chat_id
+                            
+                            # 保存到会话管理器
+                            if self.session_manager.save_session(session_id, ragflow_session_id, agent_type, agent_id):
+                                logger.info(f"创建RagFlow会话成功并持久化: A2A会话ID {session_id} -> RagFlow会话ID {ragflow_session_id}")
+                            else:
+                                logger.warning(f"会话持久化失败: A2A会话ID {session_id} -> RagFlow会话ID {ragflow_session_id}")
+                                
                             return ragflow_session_id
                     
                     # 如果是500或503错误，重试

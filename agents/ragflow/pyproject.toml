@@ -10,18 +10,45 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 dependencies = [
+    # 网络请求
     "httpx",
+    "httpx-sse",
+    # CLI工具
     "click",
+    # 环境配置
     "python-dotenv",
+    # 数据验证
     "pydantic>=2.0.0",
+    # 数据库
+    "sqlalchemy>=2.0.0",
+    "aiosqlite",
+    "asyncpg",
+    "aiomysql",
+    # 异步支持
+    "asyncio",
+    # Web服务器
+    "uvicorn",
+    "fastapi",
+    "starlette",
+    # 密码学
+    "jwcrypto",
+    "pyjwt",
+    # 日志和格式化
+    "rich",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "pytest-asyncio",
     "mypy",
+    "black",
+    "isort",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = "test_*.py" 
+python_files = "test_*.py"
+
+[project.scripts]
+ragflow-server = "agents.ragflow.start_server:main" 

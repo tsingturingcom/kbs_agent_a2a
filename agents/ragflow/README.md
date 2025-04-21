@@ -41,6 +41,14 @@ This project implements A2A protocol adapter for RagFlow knowledge base system, 
   - 支持所有A2A核心方法
   - Supports all A2A core methods
 
+- **多数据库支持** | **Multiple Database Support**
+  - 支持多种数据库存储任务和会话信息
+  - Supports various database engines for storing tasks and session information
+  - 包括SQLite、PostgreSQL、MySQL等
+  - Including SQLite, PostgreSQL, MySQL, etc.
+  - 通过配置文件灵活切换数据库类型
+  - Flexibly switch database types through configuration file
+
 ## 系统架构 | System Architecture
 
 RagFlow A2A Agent 采用了模块化设计，主要组件包括：
@@ -222,10 +230,90 @@ chat_assistants=your-chat-assistant-id
 
 # 代理ID | Agent ID (使用代理模式时需要 | required for agent mode)
 agent_id=your-agent-id
+
+# 任务存储类型 | Task storage type (可选值: memory, database | possible values: memory, database)
+TASK_STORAGE_TYPE=memory
+
+# 任务数据库连接URL | Task database connection URL (当TASK_STORAGE_TYPE=database时需要 | required when TASK_STORAGE_TYPE=database)
+TASK_DB_URL=sqlite+aiosqlite:///agents/ragflow/data/tasks.db
+
+# 会话数据库连接URL | Session database connection URL
+SESSION_DB_URL=sqlite:///agents/ragflow/data/sessions.db
 ```
 
 您也可以参考`.env.example`文件作为模板。
 You can also refer to the `.env.example` file as a template.
+
+### 数据库配置 | Database Configuration
+
+RagFlow代理支持两类独立的存储系统:
+RagFlow agent supports two independent storage systems:
+
+1. **任务存储** | **Task Storage**
+   - 控制任务状态和结果的存储方式
+   - Controls how task states and results are stored
+   - 由`TASK_STORAGE_TYPE`环境变量控制
+   - Controlled by the `TASK_STORAGE_TYPE` environment variable
+   - 可选值: `memory`(内存存储), `database`(数据库存储)
+   - Possible values: `memory` (in-memory storage), `database` (database storage)
+
+2. **会话存储** | **Session Storage**
+   - 管理会话状态和会话ID映射
+   - Manages session states and session ID mappings
+   - 始终使用数据库存储，不受`TASK_STORAGE_TYPE`影响
+   - Always uses database storage, not affected by `TASK_STORAGE_TYPE`
+   - 通过`SESSION_DB_URL`配置连接
+   - Connection configured through `SESSION_DB_URL`
+
+#### 支持的数据库类型 | Supported Database Types
+
+##### SQLite (默认 | Default)
+```
+TASK_DB_URL=sqlite+aiosqlite:///agents/ragflow/data/tasks.db
+SESSION_DB_URL=sqlite:///agents/ragflow/data/sessions.db
+```
+
+##### PostgreSQL
+```
+TASK_DB_URL=postgresql+asyncpg://username:password@localhost:5432/ragflow_tasks
+SESSION_DB_URL=postgresql://username:password@localhost:5432/ragflow_sessions
+```
+
+##### MySQL
+```
+TASK_DB_URL=mysql+aiomysql://username:password@localhost:3306/ragflow_tasks
+SESSION_DB_URL=mysql://username:password@localhost:3306/ragflow_sessions
+```
+
+#### 数据库安装与驱动 | Database Installation and Drivers
+
+使用PostgreSQL或MySQL时，需要安装相应的Python数据库驱动:
+When using PostgreSQL or MySQL, corresponding Python database drivers need to be installed:
+
+```bash
+# PostgreSQL驱动 | PostgreSQL drivers
+pip install asyncpg psycopg2-binary
+
+# MySQL驱动 | MySQL drivers
+pip install aiomysql pymysql
+```
+
+#### 数据库自动创建 | Automatic Database Creation
+
+系统会自动创建必要的数据库表和结构，无需手动创建。
+The system automatically creates necessary database tables and structures, no manual creation required.
+
+任务数据库结构:
+Task database structure:
+- 表: `tasks` - 存储任务状态和元数据
+- Table: `tasks` - Stores task states and metadata
+
+会话数据库结构:
+Session database structure:
+- 表: `session_mapping` - 存储A2A会话ID与RagFlow会话ID的映射
+- Table: `session_mapping` - Stores mappings between A2A session IDs and RagFlow session IDs
+- 表: `session_context` - 存储会话上下文和状态信息
+- Table: `session_context` - Stores session contexts and state information
 
 ## 使用方法 | Usage
 
@@ -500,6 +588,17 @@ supervisorctl restart ragflow-a2a
    - 调整超时设置适应复杂查询
    - 考虑使用流式处理减少等待感
 
+5. **数据库连接问题** | **Database Connection Issues**
+   - 确保数据库服务正在运行
+   - 验证数据库连接URL格式是否正确
+   - 检查数据库用户权限是否足够
+   - 确认数据库驱动已正确安装
+   - SQLite数据库路径是否存在且可写
+
+6. **数据库迁移** | **Database Migration**
+   - 从内存存储切换到数据库存储时任务数据不会自动迁移
+   - 从一种数据库类型切换到另一种时需要手动迁移数据
+
 ### 日志获取 | Getting Logs
 
 服务器日志默认输出到控制台和log目录下的文件，可以通过以下方式获取：
@@ -511,6 +610,31 @@ cat log/kbs_a2a_server.log
 
 # 使用Docker时查看日志 | View logs when using Docker
 docker logs ragflow-a2a-container
+```
+
+### 数据库故障排查 | Database Troubleshooting
+
+#### 检查数据库连接 | Check Database Connection
+
+```bash
+# SQLite
+sqlite3 agents/ragflow/data/sessions.db ".tables"
+
+# PostgreSQL
+psql -h localhost -U username -d ragflow_sessions -c "\dt"
+
+# MySQL
+mysql -h localhost -u username -p -e "USE ragflow_sessions; SHOW TABLES;"
+```
+
+#### 数据库目录权限 | Database Directory Permissions
+
+确保数据目录存在且有正确的权限:
+Ensure the data directory exists and has correct permissions:
+
+```bash
+mkdir -p agents/ragflow/data
+chmod 755 agents/ragflow/data
 ```
 
 ## 与其他系统的集成 | Integration with Other Systems

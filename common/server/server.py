@@ -50,6 +50,7 @@ class A2AServer:
         )
 
     def start(self):
+        """同步启动服务器 - 兼容旧代码"""
         if self.agent_card is None:
             raise ValueError("agent_card is not defined")
 
@@ -58,7 +59,27 @@ class A2AServer:
 
         import uvicorn
 
+        # 使用非异步方式启动
         uvicorn.run(self.app, host=self.host, port=self.port)
+    
+    async def start_async(self):
+        """异步启动服务器 - 用于避免嵌套事件循环"""
+        if self.agent_card is None:
+            raise ValueError("agent_card is not defined")
+
+        if self.task_manager is None:
+            raise ValueError("request_handler is not defined")
+
+        import uvicorn
+        from uvicorn.config import Config
+        from uvicorn.server import Server
+        
+        # 创建配置和服务器实例
+        config = Config(app=self.app, host=self.host, port=self.port)
+        server = Server(config=config)
+        
+        # 直接使用serve方法，避免嵌套的event loop
+        await server.serve()
 
     def _get_agent_card(self, request: Request) -> JSONResponse:
         return JSONResponse(self.agent_card.model_dump(exclude_none=True))
